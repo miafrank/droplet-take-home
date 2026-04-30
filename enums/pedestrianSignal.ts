@@ -1,4 +1,4 @@
 export enum PedestrianSignal {
-  WalkingPerson = "WALK",
-  RaisedHand = "DONT WALK",
+  WALKING_PERSON = "WALK",
+  RAISED_HAND = "DONT WALK",
 }

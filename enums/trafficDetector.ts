@@ -1,3 +1,3 @@
 export enum TrafficDetector {
-  detectorType = "IN-ROAD"
+  DETECTOR_TYPE = "IN-ROAD"
 }

@@ -1,6 +1,6 @@
 export enum VehicleSignal {
-    Red = "STOP",
-    Green = "GO",
-    Yellow = "SLOW",
-    FlashingOrange = "PROCEED WITH CAUTION",
+  RED = "STOP",
+  GREEN = "GO",
+  YELLOW = "SLOW",
+  FLASHING_ORANGE = "PROCEED WITH CAUTION",
 }
