@@ -18,5 +18,6 @@ export class Crosswalk {
 
   requestWalk() {
     this.walkRequested = true;
+    return this.walkRequested;
   }
 }
