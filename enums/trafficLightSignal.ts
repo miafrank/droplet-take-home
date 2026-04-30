@@ -1,4 +1,4 @@
-export enum VehicleSignal {
+export enum TrafficLightSignal {
   RED = "STOP",
   GREEN = "GO",
   YELLOW = "SLOW",
