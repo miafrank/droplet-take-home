@@ -1,0 +1,18 @@
+{
+  "north-south-flow": {
+    "name": "north-south-flow",
+    "activeDirections": ["NORTH", "SOUTH"],
+    "allDirections": ["NORTH", "SOUTH", "EAST", "WEST"],
+    "laneTypes": ["LEFT", "STRAIGHT", "STRAIGHT", "RIGHT"],
+    "vehiclesPerLane": 5,
+    "laneLength": 24,
+    "initialMovingSpeedMph": 15,
+    "stoppedSpeedMph": 0,
+    "targetSpeedMph": 15,
+    "straightPhaseMs": 1000,
+    "rightTurnPhaseMs": 500,
+    "leftTurnPhaseMs": 1000,
+    "movementTickMs": 250,
+    "movementDeltaSeconds": 1
+  }
+}
