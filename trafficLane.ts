@@ -1,24 +1,24 @@
 import { LaneDirection } from "./enums/laneDirection";
 import { LaneType } from "./enums/laneType";
-import { VehicleSignal } from "./enums/vehicleSignal";
+import { TrafficLightSignal } from "./enums/trafficLightSignal";
 import { Vehicle } from "./vehicle";
 
 export class TrafficLane {
   vehicles: Vehicle[];
   laneDirection: LaneDirection;
   laneType: LaneType;
-  vehicleSignal: VehicleSignal;
+  trafficLightSignal: TrafficLightSignal;
 
   constructor(
     vehicles: Vehicle[],
     laneDirection: LaneDirection,
     laneType: LaneType,
-    vehicleSignal: VehicleSignal,
+    trafficLightSignal: TrafficLightSignal,
   ) {
     this.vehicles = vehicles;
     this.laneDirection = laneDirection;
     this.laneType = laneType;
-    this.vehicleSignal = vehicleSignal;
+    this.trafficLightSignal = trafficLightSignal;
   }
 
   addVehicle(vehicle: Vehicle) {
