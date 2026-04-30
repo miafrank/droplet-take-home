@@ -4,21 +4,21 @@ import { VehicleSignal } from "./enums/vehicleSignal";
 import { Vehicle } from "./vehicle";
 
 export class TrafficLane {
+  vehicles: Vehicle[];
   laneDirection: LaneDirection;
   laneType: LaneType;
   vehicleSignal: VehicleSignal;
-  vehicles: Vehicle[];
 
   constructor(
+    vehicles: Vehicle[],
     laneDirection: LaneDirection,
     laneType: LaneType,
     vehicleSignal: VehicleSignal,
-    vehicles: Vehicle[],
   ) {
+    this.vehicles = vehicles;
     this.laneDirection = laneDirection;
     this.laneType = laneType;
     this.vehicleSignal = vehicleSignal;
-    this.vehicles = vehicles;
   }
 
   addVehicle(vehicle: Vehicle) {
