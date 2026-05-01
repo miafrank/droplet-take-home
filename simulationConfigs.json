@@ -9,11 +9,16 @@
     "initialMovingSpeedMph": 15,
     "stoppedSpeedMph": 0,
     "targetSpeedMph": 15,
-    "straightPhaseMs": 9000,
-    "rightTurnPhaseMs": 8000,
+    "straightPhaseMs": 12000,
+    "rightTurnPhaseMs": 11000,
     "leftTurnPhaseMs": 1000,
     "movementTickMs": 1000,
     "movementDeltaSeconds": 1,
+    "smartSensor": {
+      "enabled": true,
+      "requiredRedMs": 8500,
+      "triggerWeightLbs": 7500
+    },
     "pedestrianRequest": {
       "enabled": true,
       "crossingDirection": "NORTH",
