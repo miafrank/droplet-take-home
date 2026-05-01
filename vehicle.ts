@@ -5,11 +5,13 @@ export class Vehicle {
   laneType: LaneType;
   speedMph: number;
   positionFt: number;
+  weightLbs: number;
 
   constructor(
     laneType: LaneType,
     speedMph: number,
     position: number,
+    weightLbs: number,
   ) {
     const vehicleID = Math.floor(Math.random() * 1000);
 
@@ -17,6 +19,7 @@ export class Vehicle {
     this.laneType = laneType;
     this.speedMph = speedMph;
     this.positionFt = position;
+    this.weightLbs = weightLbs;
   }
 
   getSpeedPerSecond(): number {
