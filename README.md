@@ -35,6 +35,8 @@ I like to treat LLMs as a really smart pairing buddy. When I started the challen
 responsibilities, created enums to store the values for all of the different traffic states, and established the core traffic logic in `Intersection` class.
 I was cautious allowing the agent to make changes directly to my code until it gained more trust and understanding of my requests. I do this because I have more control and opinion on how the LLM should code and what style it should conform to, instead of having that established for me and possibly following it. 
 
+I like to think in a "TDD"-ish way when collaborating with an LLM. Like, thanks for the code but how do I actually verify that it works? If you look at my prompts, I separated the logic into chunks (creating pedestrian rules, parallel traffic rules, opposite traffic rules) so I was able to run the sim and verify the changes after reading through the code and removing/adding changes that I favored. This way, I get quick feedback on what to fix.
+
 ##### Design Choices
 - Separation of Concerns was top of mind when creating specific classes (`Vehicle`, `TrafficLane`, etc). Logic was added to the responsible structures to ensure that changes can be easily made and bugs can be tracked down quickly.
 - DRY: Adding customizations to simulations is easy due to the config values being pulled from the config file. Adding more lanes, lights, cars are easy to extend or create because the code is modularized and allows those changes to be made quickly by updating an array.
