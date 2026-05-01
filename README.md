@@ -46,5 +46,5 @@ I like to think in a "TDD"-ish way when collaborating with an LLM. Like, thanks 
 - Countdown for crosswalk, currently only displays raised hand or walking signal
 - Consider crosswalk length and calculating the crosswalk countdown on the average time it would take a pedestrian to reach the other side of the road
 - Above Roadway Detector sensors
-- Between the 2-6 hour timeframe, I was more towards the latter end of the timeframe. If I had more time, I would remove any unused methods (if any), and trim down some repetative logic (particularly in `intersection.ts`).
 - Enhance simulation output: the output is readable for sure, but it would be nice to add a bit more flair to the output. I was thinking of rendering a table that shows the updated state as it happen versus printing the changes to the console.
+- Account for multiple crosswalk requests, right now only the first crosswalk request is considered
