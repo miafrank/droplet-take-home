@@ -5,7 +5,15 @@ import { LaneDirection } from "./enums/laneDirection";
 import { LaneType } from "./enums/laneType";
 import { Vehicle } from "./vehicle";
 import { PedestrianSignal } from "./enums/pedestrianSignal";
-import { deltaSeconds, laneLengthSize, targetSpeedMph } from "./const";
+import {
+  deltaSeconds,
+  laneLengthSize,
+  maximumVehicleWeightLbs,
+  minimumVehicleWeightLbs,
+  smartSensorRedWaitMs,
+  smartSensorTriggerWeightLbs,
+  targetSpeedMph,
+} from "./constants";
 
 type TrafficPhase = {
   directions: LaneDirection[];
@@ -22,6 +30,20 @@ type InitializeTrafficOptions = {
   laneLength?: number;
   initialMovingSpeedMph?: number;
   stoppedSpeedMph?: number;
+};
+
+type SmartSensorOptions = {
+  currentTimeMs: number;
+  requiredRedMs?: number;
+  triggerWeightLbs?: number;
+};
+
+type SmartSensorResult = {
+  direction: LaneDirection;
+  detectedWeightLbs: number;
+  redDurationMs: number;
+  triggered: boolean;
+  waitingForBlockingTraffic: boolean;
 };
 
 type VehicleExitHandler = (vehicle: Vehicle, lane: TrafficLane) => void;
@@ -44,6 +66,9 @@ export class Intersection {
   private rightTurnTimeout?: ReturnType<typeof setTimeout>;
   private vehicleMovementTimeout?: ReturnType<typeof setTimeout>;
   private currentPhaseIndex = 0;
+  private directionRedStartedAtMs = new Map<LaneDirection, number>();
+  private pendingSensorDirections = new Set<LaneDirection>();
+  private sensorClearanceDirections = new Set<LaneDirection>();
 
   constructor(trafficLanes: TrafficLane[], crosswalks: Crosswalk[]) {
     this.trafficLanes = trafficLanes;
@@ -82,9 +107,21 @@ export class Intersection {
   ): Vehicle[] => {
     return Array.from(
       { length: vehicleCount },
-      () => new Vehicle(laneType, speedMph, positionFt),
+      () =>
+        new Vehicle(
+          laneType,
+          speedMph,
+          positionFt,
+          this.createVehicleWeightLbs(),
+        ),
     );
   };
+
+  createVehicleWeightLbs(): number {
+    const weightRange = maximumVehicleWeightLbs - minimumVehicleWeightLbs + 1;
+
+    return Math.floor(Math.random() * weightRange) + minimumVehicleWeightLbs;
+  }
 
   isActiveDirection(
     direction: LaneDirection,
@@ -435,7 +472,6 @@ export class Intersection {
         });
       }, phase.rightTurnDurationMs);
     }
-    // TODO: Where to put this
     this.trafficCycleTimeout = setTimeout(() => {
       this.currentPhaseIndex = (this.currentPhaseIndex + 1) % phases.length;
       this.runTrafficPhase();
@@ -539,6 +575,143 @@ export class Intersection {
     );
   }
 
+  canClearSensorBlockedTraffic(lane: TrafficLane, vehicle: Vehicle): boolean {
+    if (this.sensorClearanceDirections.size === 0) {
+      return false;
+    }
+
+    if (this.sensorClearanceDirections.has(lane.laneDirection)) {
+      return false;
+    }
+
+    return this.isVehicleMovingThroughIntersection(vehicle, lane);
+  }
+
+  getLanesForDirection(direction: LaneDirection): TrafficLane[] {
+    return this.trafficLanes.filter((lane: TrafficLane) => {
+      return lane.laneDirection === direction;
+    });
+  }
+
+  areAllDirectionSignalsRed(direction: LaneDirection): boolean {
+    const lanes = this.getLanesForDirection(direction);
+
+    return (
+      lanes.length > 0 &&
+      lanes.every((lane: TrafficLane) => {
+        return lane.trafficLightSignal === TrafficLightSignal.RED;
+      })
+    );
+  }
+
+  getDetectedDirectionWeightLbs(direction: LaneDirection): number {
+    return this.getLanesForDirection(direction).reduce(
+      (totalWeightLbs: number, lane: TrafficLane) => {
+        return totalWeightLbs + lane.sensor.getDetectedWeightLbs(lane.vehicles);
+      },
+      0,
+    );
+  }
+
+  hasMovingTrafficOutsideDirections(directions: LaneDirection[]): boolean {
+    return this.trafficLanes.some((lane: TrafficLane) => {
+      const leadVehicle = lane.vehicles[0];
+
+      if (!leadVehicle || directions.includes(lane.laneDirection)) {
+        return false;
+      }
+
+      return this.isVehicleMovingThroughIntersection(leadVehicle, lane);
+    });
+  }
+
+  setBlockingDirectionsRedForSensor(targetDirections: LaneDirection[]): void {
+    this.trafficLanes.forEach((lane: TrafficLane) => {
+      if (!targetDirections.includes(lane.laneDirection)) {
+        lane.trafficLightSignal = TrafficLightSignal.RED;
+      }
+    });
+  }
+
+  setSensorTriggeredDirectionsGreen(directions: LaneDirection[]): void {
+    this.trafficLanes.forEach((lane: TrafficLane) => {
+      if (!directions.includes(lane.laneDirection)) {
+        lane.trafficLightSignal = TrafficLightSignal.RED;
+        return;
+      }
+
+      if (lane.laneType === LaneType.LEFT) {
+        lane.trafficLightSignal = TrafficLightSignal.FLASHING_ORANGE;
+        return;
+      }
+
+      lane.trafficLightSignal = TrafficLightSignal.GREEN;
+    });
+  }
+
+  evaluateSmartSensors(options: SmartSensorOptions): SmartSensorResult[] {
+    const requiredRedMs = options.requiredRedMs ?? smartSensorRedWaitMs;
+    const triggerWeightLbs =
+      options.triggerWeightLbs ?? smartSensorTriggerWeightLbs;
+    const results: SmartSensorResult[] = [];
+
+    this.laneDirections.forEach((direction: LaneDirection) => {
+      const allSignalsRed = this.areAllDirectionSignalsRed(direction);
+
+      if (!allSignalsRed) {
+        this.directionRedStartedAtMs.delete(direction);
+        this.pendingSensorDirections.delete(direction);
+        this.sensorClearanceDirections.delete(direction);
+        return;
+      }
+
+      if (!this.directionRedStartedAtMs.has(direction)) {
+        this.directionRedStartedAtMs.set(direction, options.currentTimeMs);
+      }
+
+      const redStartedAtMs =
+        this.directionRedStartedAtMs.get(direction) ?? options.currentTimeMs;
+      const redDurationMs = options.currentTimeMs - redStartedAtMs;
+      const detectedWeightLbs = this.getDetectedDirectionWeightLbs(direction);
+      const targetDirections = this.fetchParallelDirections(direction);
+      const hasSensorDemand =
+        detectedWeightLbs >= triggerWeightLbs && redDurationMs >= requiredRedMs;
+
+      if (!hasSensorDemand && !this.pendingSensorDirections.has(direction)) {
+        return;
+      }
+
+      this.pendingSensorDirections.add(direction);
+      targetDirections.forEach((targetDirection: LaneDirection) => {
+        this.sensorClearanceDirections.add(targetDirection);
+      });
+
+      const waitingForBlockingTraffic =
+        this.hasMovingTrafficOutsideDirections(targetDirections);
+
+      if (!waitingForBlockingTraffic) {
+        this.setSensorTriggeredDirectionsGreen(targetDirections);
+        this.pendingSensorDirections.delete(direction);
+        targetDirections.forEach((targetDirection: LaneDirection) => {
+          this.sensorClearanceDirections.delete(targetDirection);
+        });
+        this.directionRedStartedAtMs.delete(direction);
+      } else {
+        this.setBlockingDirectionsRedForSensor(targetDirections);
+      }
+
+      results.push({
+        direction,
+        detectedWeightLbs,
+        redDurationMs,
+        triggered: !waitingForBlockingTraffic,
+        waitingForBlockingTraffic,
+      });
+    });
+
+    return results;
+  }
+
   setRightTurnsRed(activeDirections: LaneDirection[]): void {
     this.trafficLanes.forEach((lane: TrafficLane) => {
       const shouldStopRightTurn =
@@ -606,7 +779,10 @@ export class Intersection {
         return;
       }
 
-      if (!this.canMoveOnTrafficSignal(lane)) {
+      if (
+        !this.canMoveOnTrafficSignal(lane) &&
+        !this.canClearSensorBlockedTraffic(lane, vehicle)
+      ) {
         vehicle.decelerate(movementDeltaSeconds);
         return;
       }
