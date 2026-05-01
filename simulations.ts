@@ -60,9 +60,8 @@ type TrafficSimulationConfigJson = Omit<
 
 type TrafficSimulationConfigFile = Record<string, TrafficSimulationConfigJson>;
 
-const simulationConfigs = require(
-  "./simulationConfigs.json",
-) as TrafficSimulationConfigFile;
+const simulationConfigs =
+  require("./config/simulationConfigs.json") as TrafficSimulationConfigFile;
 
 const parseLaneDirection = (value: string): LaneDirection => {
   switch (value) {
@@ -223,7 +222,9 @@ const renderIntersectionState = (
 ): void => {
   console.log("");
   console.log(`=== ${title} ===`);
-  console.log(`Active traffic flow: ${directionLabel(config.activeDirections)}`);
+  console.log(
+    `Active traffic flow: ${directionLabel(config.activeDirections)}`,
+  );
 
   if (config.smartSensor?.enabled) {
     const sensorStatus = config.allDirections
@@ -258,7 +259,9 @@ const renderIntersectionState = (
       (lane: TrafficLane) => lane.laneDirection === direction,
     );
 
-    console.log(active ? `${direction} active lanes` : `${direction} waiting lanes`);
+    console.log(
+      active ? `${direction} active lanes` : `${direction} waiting lanes`,
+    );
 
     lanes.forEach((lane: TrafficLane) => {
       renderLane(
@@ -272,9 +275,7 @@ const renderIntersectionState = (
   });
 };
 
-export const runTrafficSimulation = (
-  config: TrafficSimulationConfig,
-): void => {
+export const runTrafficSimulation = (config: TrafficSimulationConfig): void => {
   const intersection = new Intersection([], []);
   intersection.initializeTraffic(config);
   let pedestrianStatus = "not requested";
@@ -416,64 +417,66 @@ export const runTrafficSimulation = (
           pedestrianBlockedDirections,
           pedestrianAllowedDirections,
         );
-      },
-      pedestrianRequest.requestAfterMs +
-        pedestrianRequest.trafficClearanceDelayMs),
+      }, pedestrianRequest.requestAfterMs + pedestrianRequest.trafficClearanceDelayMs),
     );
 
     pedestrianTimeouts.push(
-      setTimeout(() => {
-        pedestrianStatus = "crossing";
-        pedestrianBlockedDirections = intersection.fetchBlockedDirections(
-          pedestrianRequest.crossingDirection,
-        );
-        pedestrianAllowedDirections = intersection.fetchParallelDirections(
-          pedestrianRequest.crossingDirection,
-        );
-        intersection.startPedestrianCrossing(
-          pedestrianRequest.crossingDirection,
-        );
-        console.log(
-          `Pedestrian is crossing: blockingDirections=${directionLabel(pedestrianBlockedDirections)}`,
-        );
-        renderIntersectionState(
-          "Pedestrian Crossing",
-          intersection,
-          config,
-          pedestrianStatus,
-          pedestrianBlockedDirections,
-          pedestrianAllowedDirections,
-        );
-      },
-      pedestrianRequest.requestAfterMs +
-        pedestrianRequest.trafficClearanceDelayMs +
-        pedestrianRequest.yellowPhaseMs),
+      setTimeout(
+        () => {
+          pedestrianStatus = "crossing";
+          pedestrianBlockedDirections = intersection.fetchBlockedDirections(
+            pedestrianRequest.crossingDirection,
+          );
+          pedestrianAllowedDirections = intersection.fetchParallelDirections(
+            pedestrianRequest.crossingDirection,
+          );
+          intersection.startPedestrianCrossing(
+            pedestrianRequest.crossingDirection,
+          );
+          console.log(
+            `Pedestrian is crossing: blockingDirections=${directionLabel(pedestrianBlockedDirections)}`,
+          );
+          renderIntersectionState(
+            "Pedestrian Crossing",
+            intersection,
+            config,
+            pedestrianStatus,
+            pedestrianBlockedDirections,
+            pedestrianAllowedDirections,
+          );
+        },
+        pedestrianRequest.requestAfterMs +
+          pedestrianRequest.trafficClearanceDelayMs +
+          pedestrianRequest.yellowPhaseMs,
+      ),
     );
 
     pedestrianTimeouts.push(
-      setTimeout(() => {
-        pedestrianStatus = "finished";
-        intersection.finishPedestrianCrossing(
-          pedestrianRequest.crossingDirection,
-        );
-        pedestrianBlockedDirections = [];
-        pedestrianAllowedDirections = [];
-        console.log(
-          `Pedestrian finished crossing: direction=${pedestrianRequest.crossingDirection}`,
-        );
-        renderIntersectionState(
-          "Pedestrian Finished Crossing",
-          intersection,
-          config,
-          pedestrianStatus,
-          pedestrianBlockedDirections,
-          pedestrianAllowedDirections,
-        );
-      },
-      pedestrianRequest.requestAfterMs +
-        pedestrianRequest.trafficClearanceDelayMs +
-        pedestrianRequest.yellowPhaseMs +
-        pedestrianRequest.crossingDurationMs),
+      setTimeout(
+        () => {
+          pedestrianStatus = "finished";
+          intersection.finishPedestrianCrossing(
+            pedestrianRequest.crossingDirection,
+          );
+          pedestrianBlockedDirections = [];
+          pedestrianAllowedDirections = [];
+          console.log(
+            `Pedestrian finished crossing: direction=${pedestrianRequest.crossingDirection}`,
+          );
+          renderIntersectionState(
+            "Pedestrian Finished Crossing",
+            intersection,
+            config,
+            pedestrianStatus,
+            pedestrianBlockedDirections,
+            pedestrianAllowedDirections,
+          );
+        },
+        pedestrianRequest.requestAfterMs +
+          pedestrianRequest.trafficClearanceDelayMs +
+          pedestrianRequest.yellowPhaseMs +
+          pedestrianRequest.crossingDurationMs,
+      ),
     );
   }
 
@@ -517,7 +520,9 @@ const main = (scenarioName: string): void => {
   }
 
   console.log(`Unknown simulation: ${scenarioName}`);
-  console.log(`Available simulations: ${Object.keys(simulationConfigs).join(", ")}`);
+  console.log(
+    `Available simulations: ${Object.keys(simulationConfigs).join(", ")}`,
+  );
 };
 
 main(process.argv[2] ?? "north-south-flow");
