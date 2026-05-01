@@ -153,9 +153,9 @@ export class Intersection {
   }
 
   initializeTraffic(options: InitializeTrafficOptions = {}): void {
-    // Initialize North-South travel with left turn lights set to RED,
+    // Initialize North-South travel with left turn lights set to Flashing Orange,
     // Straight and right lights are set to GREEN and all East-West traffic lights set to RED
-    // Pedestrian signals are all said to RAISED HAND - no walks requested
+    // Pedestrian requests walk in the middle of the N-S cycle
     const allDirections = options.allDirections ?? this.laneDirections;
     const laneTypes = options.laneTypes ?? this.laneTypes;
     const activeDirections = options.activeDirections ?? [
