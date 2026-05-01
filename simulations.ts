@@ -137,6 +137,7 @@ const isPedestrianBlockedDirection = (
 };
 
 const renderLane = (
+  intersection: Intersection,
   lane: TrafficLane,
   shouldRenderVehicleDetails: boolean,
   pedestrianBlockedDirections: LaneDirection[],
@@ -155,6 +156,28 @@ const renderLane = (
   if (blockedByPedestrian || stoppedByPedestrianCrossing) {
     console.log(
       `  ${lane.laneDirection} ${lane.laneType}: signal=${lane.trafficLightSignal}, waiting=${waitingVehicleCount}, pedestrianBlock=YES, trafficMoving=false`,
+    );
+    return;
+  }
+
+  if (
+    shouldRenderVehicleDetails &&
+    lane.trafficLightSignal === TrafficLightSignal.FLASHING_ORANGE &&
+    lane.laneType === LaneType.LEFT
+  ) {
+    const vehicle = lane.vehicles[0];
+    const hasOncomingTraffic = intersection.hasOncomingStraightTraffic(lane);
+    const permissiveStatus = hasOncomingTraffic ? "WAIT" : "CLEAR";
+
+    if (!vehicle) {
+      console.log(
+        `  ${lane.laneDirection} ${lane.laneType}: signal=${lane.trafficLightSignal}, permissiveLeft=${permissiveStatus}, no active vehicle`,
+      );
+      return;
+    }
+
+    console.log(
+      `  ${lane.laneDirection} ${lane.laneType}: signal=${lane.trafficLightSignal}, permissiveLeft=${permissiveStatus}, vehicle=${vehicle.id}, laneType=${vehicle.laneType}, speed=${formatSpeed(vehicle.speedMph)}, position=${formatPosition(vehicle.positionFt)}`,
     );
     return;
   }
@@ -219,6 +242,7 @@ const renderIntersectionState = (
 
     lanes.forEach((lane: TrafficLane) => {
       renderLane(
+        intersection,
         lane,
         active,
         pedestrianBlockedDirections,
