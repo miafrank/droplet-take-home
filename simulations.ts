@@ -27,7 +27,14 @@ type TrafficSimulationConfig = {
   leftTurnPhaseMs: number;
   movementTickMs: number;
   movementDeltaSeconds: number;
+  smartSensor?: SmartSensorConfig;
   pedestrianRequest?: PedestrianRequestConfig;
+};
+
+type SmartSensorConfig = {
+  enabled: boolean;
+  requiredRedMs: number;
+  triggerWeightLbs: number;
 };
 
 type PedestrianRequestConfig = {
@@ -218,6 +225,19 @@ const renderIntersectionState = (
   console.log(`=== ${title} ===`);
   console.log(`Active traffic flow: ${directionLabel(config.activeDirections)}`);
 
+  if (config.smartSensor?.enabled) {
+    const sensorStatus = config.allDirections
+      .map((direction: LaneDirection) => {
+        const detectedWeightLbs =
+          intersection.getDetectedDirectionWeightLbs(direction);
+
+        return `${direction}:${detectedWeightLbs}lbs`;
+      })
+      .join(", ");
+
+    console.log(`Smart sensors: ${sensorStatus}`);
+  }
+
   if (config.pedestrianRequest?.enabled) {
     const crosswalk = intersection.findCrosswalk(
       config.pedestrianRequest.crossingDirection,
@@ -260,6 +280,9 @@ export const runTrafficSimulation = (
   let pedestrianStatus = "not requested";
   let pedestrianBlockedDirections: LaneDirection[] = [];
   let pedestrianAllowedDirections: LaneDirection[] = [];
+  const simulationStartedAtMs = Date.now();
+  let rightTurnTimeout: ReturnType<typeof setTimeout> | undefined;
+  let leftTurnTimeout: ReturnType<typeof setTimeout> | undefined;
 
   renderIntersectionState(
     "Starting State",
@@ -271,6 +294,38 @@ export const runTrafficSimulation = (
   );
 
   const movementInterval = setInterval(() => {
+    if (config.smartSensor?.enabled) {
+      const sensorResults = intersection.evaluateSmartSensors({
+        currentTimeMs: Date.now() - simulationStartedAtMs,
+        requiredRedMs: config.smartSensor.requiredRedMs,
+        triggerWeightLbs: config.smartSensor.triggerWeightLbs,
+      });
+
+      sensorResults.forEach((sensorResult) => {
+        const message = sensorResult.waitingForBlockingTraffic
+          ? "Smart sensor demand waiting for blocking traffic to clear"
+          : "Smart sensor changed lights to GREEN";
+
+        console.log(
+          `${message}: direction=${sensorResult.direction}, detectedWeight=${sensorResult.detectedWeightLbs}lbs, redDuration=${sensorResult.redDurationMs}ms`,
+        );
+
+        if (sensorResult.triggered) {
+          config.activeDirections = intersection.fetchParallelDirections(
+            sensorResult.direction,
+          );
+
+          if (rightTurnTimeout) {
+            clearTimeout(rightTurnTimeout);
+          }
+
+          if (leftTurnTimeout) {
+            clearTimeout(leftTurnTimeout);
+          }
+        }
+      });
+    }
+
     intersection.moveVehiclesBySignalOnce({
       movementDeltaSeconds: config.movementDeltaSeconds,
       targetSpeedMph: config.targetSpeedMph,
@@ -297,7 +352,7 @@ export const runTrafficSimulation = (
     );
   }, config.movementTickMs);
 
-  const rightTurnTimeout = setTimeout(() => {
+  rightTurnTimeout = setTimeout(() => {
     intersection.setRightTurnsRed(config.activeDirections);
     renderIntersectionState(
       "Right Turn Phase Ended",
@@ -309,7 +364,7 @@ export const runTrafficSimulation = (
     );
   }, config.rightTurnPhaseMs);
 
-  const leftTurnTimeout = setTimeout(() => {
+  leftTurnTimeout = setTimeout(() => {
     intersection.setParallelLeftTurnsGreen(config.activeDirections);
     renderIntersectionState(
       "Left Turn Phase Started",
@@ -424,8 +479,13 @@ export const runTrafficSimulation = (
 
   setTimeout(() => {
     clearInterval(movementInterval);
-    clearTimeout(rightTurnTimeout);
-    clearTimeout(leftTurnTimeout);
+    if (rightTurnTimeout) {
+      clearTimeout(rightTurnTimeout);
+    }
+
+    if (leftTurnTimeout) {
+      clearTimeout(leftTurnTimeout);
+    }
     pedestrianTimeouts.forEach((timeout) => clearTimeout(timeout));
     renderIntersectionState(
       "Simulation Complete",
