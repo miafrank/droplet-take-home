@@ -531,7 +531,10 @@ export class Intersection {
     }
   }
 
-  isVehicleMovingThroughIntersection(vehicle: Vehicle, lane: TrafficLane): boolean {
+  isVehicleMovingThroughIntersection(
+    vehicle: Vehicle,
+    lane: TrafficLane,
+  ): boolean {
     return (
       vehicle.speedMph > 0 &&
       vehicle.positionFt >= 0 &&
