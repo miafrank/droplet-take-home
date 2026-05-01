@@ -5,3 +5,4 @@ export const minimumVehicleWeightLbs = 2500;
 export const maximumVehicleWeightLbs = 5000;
 export const smartSensorTriggerWeightLbs = 7500;
 export const smartSensorRedWaitMs = 120_000;
+export const crossingDurationMs = 30_000;
