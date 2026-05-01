@@ -32,7 +32,7 @@ The transcript can be found in `llm_output_droplet.txt`
 
 I like to treat LLMs as a really smart pairing buddy. When I started the challenge, I started with already existing code instead of generating boilerplate classes with the agent. I created the specific classes, to isolate 
 responsibilities, created enums to store the values for all of the different traffic states, and established the core traffic logic in `Intersection` class.
-I was cautious allowing the agent to make changes directly to my code until it gained more trust and understanding of my requests. I do this because I have more control and opinion on how the LLM should code and what style it should conform to, instead of having that decided for me. 
+I was cautious allowing the agent to make changes directly to my code until it gained more trust and understanding of my requests. I do this because I have more control and opinion on how the LLM should code and what style it should conform to, instead of having that established for me and possibly following it. 
 
 ##### Design Choices
 - Separation of Concerns was top of mind when creating specific classes (`Vehicle`, `TrafficLane`, etc). Logic was added to the responsible structures to ensure that changes can be easily made and bugs can be tracked down quickly.
