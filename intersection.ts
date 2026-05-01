@@ -31,6 +31,8 @@ type VehicleMovementOptions = {
   targetSpeedMph?: number;
   stoppedSpeedMph?: number;
   initialMovingSpeedMph?: number;
+  blockedDirections?: LaneDirection[];
+  pedestrianAllowedDirections?: LaneDirection[];
   onVehicleExit?: VehicleExitHandler;
 };
 
@@ -246,47 +248,98 @@ export class Intersection {
     return previousSignals;
   }
 
-  requestPedestrianCrossing(crossingDirection: LaneDirection): void {
-    // _TODO_: Account for multiple walks requested in non-parallel directions
-
-    const crosswalk = this.crosswalks.find(
-      // Find first occurence of requested walk
+  findCrosswalk(crossingDirection: LaneDirection): Crosswalk | undefined {
+    return this.crosswalks.find(
       (cw: Crosswalk) => cw.laneDirection === crossingDirection,
     );
+  }
+
+  requestPedestrianWalk(crossingDirection: LaneDirection): boolean {
+    const crosswalk = this.findCrosswalk(crossingDirection);
+
+    if (!crosswalk) {
+      return false;
+    }
+
+    return crosswalk.requestWalk();
+  }
+
+  setPedestrianClearanceSignals(crossingDirection: LaneDirection): void {
+    const blockedDirections: LaneDirection[] =
+      this.fetchBlockedDirections(crossingDirection);
+    const parallelDirections: LaneDirection[] =
+      this.fetchParallelDirections(crossingDirection);
+
+    this.trafficLanes.forEach((lane: TrafficLane) => {
+      const shouldRemainGreen =
+        parallelDirections.includes(lane.laneDirection) &&
+        lane.laneType === LaneType.STRAIGHT;
+      const shouldStopForPedestrian =
+        blockedDirections.includes(lane.laneDirection) || !shouldRemainGreen;
+
+      if (
+        shouldStopForPedestrian &&
+        lane.trafficLightSignal === TrafficLightSignal.GREEN
+      ) {
+        lane.trafficLightSignal = TrafficLightSignal.YELLOW;
+      }
+    });
+  }
+
+  startPedestrianCrossing(
+    crossingDirection: LaneDirection,
+  ): Map<TrafficLane, TrafficLightSignal> | undefined {
+    const crosswalk = this.findCrosswalk(crossingDirection);
+
+    if (!crosswalk) {
+      return undefined;
+    }
+
+    const previousSignals = this.updateTrafficSignalsOnPedestrianCrossing(
+      this.fetchParallelDirections(crossingDirection),
+      this.fetchBlockedDirections(crossingDirection),
+    );
+
+    crosswalk.pedestrianSignal = PedestrianSignal.WALKING_PERSON;
+
+    return previousSignals;
+  }
+
+  finishPedestrianCrossing(
+    crossingDirection: LaneDirection,
+    previousSignals?: Map<TrafficLane, TrafficLightSignal>,
+  ): void {
+    const crosswalk = this.findCrosswalk(crossingDirection);
 
     if (!crosswalk) {
       return;
     }
 
-    const blockedDirections: LaneDirection[] =
-      this.fetchBlockedDirections(crossingDirection);
+    crosswalk.pedestrianSignal = PedestrianSignal.RAISED_HAND;
+    crosswalk.walkRequested = false;
 
-    const parallelDirections: LaneDirection[] =
-      this.fetchParallelDirections(crossingDirection);
+    if (previousSignals) {
+      this.trafficLanes.forEach((lane: TrafficLane) => {
+        const previousSignal = previousSignals.get(lane);
 
-    const previousSignals = this.updateTrafficSignalsOnPedestrianCrossing(
-      parallelDirections,
-      blockedDirections,
-    );
+        if (previousSignal) {
+          lane.trafficLightSignal = previousSignal;
+        }
+      });
+    }
+  }
 
-    // TODO: What logic can we move to CrossWalk
-
-    // simulate ped x-ing request, 30 second phase
-    if (crosswalk.requestWalk()) {
-      crosswalk.pedestrianSignal = PedestrianSignal.WALKING_PERSON;
+  requestPedestrianCrossing(
+    crossingDirection: LaneDirection,
+    crossingDurationMs = 30_000,
+  ): void {
+    // _TODO_: Account for multiple walks requested in non-parallel directions
+    if (this.requestPedestrianWalk(crossingDirection)) {
+      const previousSignals = this.startPedestrianCrossing(crossingDirection);
 
       setTimeout(() => {
-        crosswalk.pedestrianSignal = PedestrianSignal.RAISED_HAND;
-        crosswalk.walkRequested = false;
-
-        this.trafficLanes.forEach((lane: TrafficLane) => {
-          const previousSignal = previousSignals.get(lane);
-
-          if (previousSignal) {
-            lane.trafficLightSignal = previousSignal;
-          }
-        });
-      }, 30_000);
+        this.finishPedestrianCrossing(crossingDirection, previousSignals);
+      }, crossingDurationMs);
     }
   }
 
@@ -430,6 +483,8 @@ export class Intersection {
     const stoppedSpeedMph = options.stoppedSpeedMph ?? 0;
     const initialMovingSpeedMph =
       options.initialMovingSpeedMph ?? movementTargetSpeedMph;
+    const blockedDirections = options.blockedDirections ?? [];
+    const pedestrianAllowedDirections = options.pedestrianAllowedDirections;
 
     this.trafficLanes.forEach((lane: TrafficLane) => {
       const vehicle = lane.vehicles[0];
@@ -442,6 +497,18 @@ export class Intersection {
         vehicle.accelerate(movementDeltaSeconds, movementTargetSpeedMph);
       } else {
         vehicle.decelerate(movementDeltaSeconds);
+      }
+
+      if (blockedDirections.includes(lane.laneDirection)) {
+        return;
+      }
+
+      if (
+        pedestrianAllowedDirections &&
+        (!pedestrianAllowedDirections.includes(lane.laneDirection) ||
+          lane.laneType !== LaneType.STRAIGHT)
+      ) {
+        return;
       }
 
       vehicle.positionFt += vehicle.getSpeedPerSecond() * movementDeltaSeconds;
