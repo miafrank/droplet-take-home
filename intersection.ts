@@ -104,6 +104,17 @@ export class Intersection {
     );
   }
 
+  isInitialFlashingOrangeLane(
+    direction: LaneDirection,
+    laneType: LaneType,
+    activeDirections: LaneDirection[],
+  ): boolean {
+    return (
+      this.isActiveDirection(direction, activeDirections) &&
+      laneType === LaneType.LEFT
+    );
+  }
+
   initializeTraffic(options: InitializeTrafficOptions = {}): void {
     // Initialize North-South travel with left turn lights set to RED,
     // Straight and right lights are set to GREEN and all East-West traffic lights set to RED
@@ -125,9 +136,16 @@ export class Intersection {
           laneType,
           activeDirections,
         );
+        const startsFlashingOrange = this.isInitialFlashingOrangeLane(
+          laneDirections,
+          laneType,
+          activeDirections,
+        );
         const vehicleSignal = startsGreen
           ? TrafficLightSignal.GREEN
-          : TrafficLightSignal.RED;
+          : startsFlashingOrange
+            ? TrafficLightSignal.FLASHING_ORANGE
+            : TrafficLightSignal.RED;
         const speedMph = startsGreen ? initialMovingSpeedMph : stoppedSpeedMph;
 
         return new TrafficLane(
@@ -327,6 +345,10 @@ export class Intersection {
         }
       });
     }
+
+    this.setParallelLeftTurnsFlashingOrange(
+      this.fetchParallelDirections(crossingDirection),
+    );
   }
 
   requestPedestrianCrossing(
@@ -385,6 +407,13 @@ export class Intersection {
 
       const isActiveLeftLane =
         phase.laneType === LaneType.LEFT && lane.laneType === LaneType.LEFT;
+      const isPermissiveLeftLane =
+        phase.laneType === LaneType.STRAIGHT && lane.laneType === LaneType.LEFT;
+
+      if (isActiveDirection && isPermissiveLeftLane) {
+        lane.trafficLightSignal = TrafficLightSignal.FLASHING_ORANGE;
+        return;
+      }
 
       lane.trafficLightSignal =
         isActiveDirection &&
@@ -453,6 +482,63 @@ export class Intersection {
     return lane.length + this.getNextLaneLength(lane);
   }
 
+  getOppositeDirection(direction: LaneDirection): LaneDirection {
+    switch (direction) {
+      case LaneDirection.NORTH:
+        return LaneDirection.SOUTH;
+      case LaneDirection.SOUTH:
+        return LaneDirection.NORTH;
+      case LaneDirection.EAST:
+        return LaneDirection.WEST;
+      case LaneDirection.WEST:
+        return LaneDirection.EAST;
+    }
+  }
+
+  isVehicleMovingThroughIntersection(vehicle: Vehicle, lane: TrafficLane): boolean {
+    return (
+      vehicle.speedMph > 0 &&
+      vehicle.positionFt >= 0 &&
+      vehicle.positionFt < this.getExitDistanceFt(lane)
+    );
+  }
+
+  hasOncomingStraightTraffic(leftTurnLane: TrafficLane): boolean {
+    if (leftTurnLane.laneType !== LaneType.LEFT) {
+      return false;
+    }
+
+    const oppositeDirection = this.getOppositeDirection(
+      leftTurnLane.laneDirection,
+    );
+
+    return this.trafficLanes.some((lane: TrafficLane) => {
+      const leadVehicle = lane.vehicles[0];
+
+      if (!leadVehicle) {
+        return false;
+      }
+
+      return (
+        lane.laneDirection === oppositeDirection &&
+        lane.laneType === LaneType.STRAIGHT &&
+        this.isVehicleMovingThroughIntersection(leadVehicle, lane)
+      );
+    });
+  }
+
+  canMoveOnTrafficSignal(lane: TrafficLane): boolean {
+    if (lane.trafficLightSignal === TrafficLightSignal.GREEN) {
+      return true;
+    }
+
+    return (
+      lane.trafficLightSignal === TrafficLightSignal.FLASHING_ORANGE &&
+      lane.laneType === LaneType.LEFT &&
+      !this.hasOncomingStraightTraffic(lane)
+    );
+  }
+
   setRightTurnsRed(activeDirections: LaneDirection[]): void {
     this.trafficLanes.forEach((lane: TrafficLane) => {
       const shouldStopRightTurn =
@@ -477,6 +563,19 @@ export class Intersection {
     });
   }
 
+  setParallelLeftTurnsFlashingOrange(activeDirections: LaneDirection[]): void {
+    this.trafficLanes.forEach((lane: TrafficLane) => {
+      const shouldAllowPermissiveLeftTurn =
+        this.isActiveDirection(lane.laneDirection, activeDirections) &&
+        lane.laneType === LaneType.LEFT &&
+        lane.trafficLightSignal === TrafficLightSignal.RED;
+
+      if (shouldAllowPermissiveLeftTurn) {
+        lane.trafficLightSignal = TrafficLightSignal.FLASHING_ORANGE;
+      }
+    });
+  }
+
   moveVehiclesBySignalOnce(options: VehicleMovementOptions = {}): void {
     const movementDeltaSeconds = options.movementDeltaSeconds ?? deltaSeconds;
     const movementTargetSpeedMph = options.targetSpeedMph ?? targetSpeedMph;
@@ -493,13 +592,8 @@ export class Intersection {
         return;
       }
 
-      if (lane.trafficLightSignal === TrafficLightSignal.GREEN) {
-        vehicle.accelerate(movementDeltaSeconds, movementTargetSpeedMph);
-      } else {
-        vehicle.decelerate(movementDeltaSeconds);
-      }
-
       if (blockedDirections.includes(lane.laneDirection)) {
+        vehicle.decelerate(movementDeltaSeconds);
         return;
       }
 
@@ -508,9 +602,16 @@ export class Intersection {
         (!pedestrianAllowedDirections.includes(lane.laneDirection) ||
           lane.laneType !== LaneType.STRAIGHT)
       ) {
+        vehicle.decelerate(movementDeltaSeconds);
         return;
       }
 
+      if (!this.canMoveOnTrafficSignal(lane)) {
+        vehicle.decelerate(movementDeltaSeconds);
+        return;
+      }
+
+      vehicle.accelerate(movementDeltaSeconds, movementTargetSpeedMph);
       vehicle.positionFt += vehicle.getSpeedPerSecond() * movementDeltaSeconds;
 
       if (vehicle.positionFt < this.getExitDistanceFt(lane)) {
