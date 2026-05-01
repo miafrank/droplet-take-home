@@ -402,7 +402,6 @@ export class Intersection {
     }
   }
 
-  // TODO: parameterze to include differnet lanes
   runTrafficPhase(): void {
     const phases: TrafficPhase[] = [
       {
