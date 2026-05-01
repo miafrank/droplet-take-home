@@ -30,10 +30,12 @@ Sources:
 
 The transcript can be found in `llm_output_droplet.txt`
 
-I like to treat LLMs as a really smart pairing buddy. When I started the challenge, I started with already existing code instead of generating boilerplate classes with the agent. I was cautious allowing the agent to make changes directly to my code until it gained more trust and understanding of my requests. I do this because I have more control and opinion on how the LLM should code and what style it should conform to, instead of having that decided for me. 
+I like to treat LLMs as a really smart pairing buddy. When I started the challenge, I started with already existing code instead of generating boilerplate classes with the agent. I created the specific classes, to isolate 
+responsibilities, created enums to store the values for all of the different traffic states, and established the core traffic logic in `Intersection` class.
+I was cautious allowing the agent to make changes directly to my code until it gained more trust and understanding of my requests. I do this because I have more control and opinion on how the LLM should code and what style it should conform to, instead of having that decided for me. 
 
 ##### Design Choices
-- Distinct responsibilities and Separation of Concerns were top of mind when creating specific classes (`Vehicle`, `TrafficLane`, etc). Logic was added to the responsible structures to ensure that changes can be easily made and bugs can be tracked down quickly.
+- Separation of Concerns was top of mind when creating specific classes (`Vehicle`, `TrafficLane`, etc). Logic was added to the responsible structures to ensure that changes can be easily made and bugs can be tracked down quickly.
 - DRY: Adding customizations to simulations is easy due to the config values being pulled from the config file. Adding more lanes, lights, cars are easy to extend or create because the code is modularized and allows those changes to be made quickly by updating an array.
 - Enums: No magic strings over here. Type Safety ftw.
 
