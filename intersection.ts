@@ -13,14 +13,8 @@ import {
   smartSensorRedWaitMs,
   smartSensorTriggerWeightLbs,
   targetSpeedMph,
+  crossingDurationMs,
 } from "./constants";
-
-type TrafficPhase = {
-  directions: LaneDirection[];
-  laneType: LaneType;
-  durationsMs: number;
-  rightTurnDurationMs?: number;
-};
 
 type InitializeTrafficOptions = {
   activeDirections?: LaneDirection[];
@@ -99,6 +93,12 @@ export class Intersection {
     LaneDirection.WEST,
   ]);
 
+  createVehicleWeightLbs(): number {
+    const weightRange = maximumVehicleWeightLbs - minimumVehicleWeightLbs + 1;
+
+    return Math.floor(Math.random() * weightRange) + minimumVehicleWeightLbs;
+  }
+
   createVehicles = (
     laneType: LaneType,
     vehicleCount = Math.floor(Math.random() * 6) + 5,
@@ -116,12 +116,6 @@ export class Intersection {
         ),
     );
   };
-
-  createVehicleWeightLbs(): number {
-    const weightRange = maximumVehicleWeightLbs - minimumVehicleWeightLbs + 1;
-
-    return Math.floor(Math.random() * weightRange) + minimumVehicleWeightLbs;
-  }
 
   isActiveDirection(
     direction: LaneDirection,
@@ -388,95 +382,6 @@ export class Intersection {
     );
   }
 
-  requestPedestrianCrossing(
-    crossingDirection: LaneDirection,
-    crossingDurationMs = 30_000,
-  ): void {
-    // _TODO_: Account for multiple walks requested in non-parallel directions
-    if (this.requestPedestrianWalk(crossingDirection)) {
-      const previousSignals = this.startPedestrianCrossing(crossingDirection);
-
-      setTimeout(() => {
-        this.finishPedestrianCrossing(crossingDirection, previousSignals);
-      }, crossingDurationMs);
-    }
-  }
-
-  runTrafficPhase(): void {
-    const phases: TrafficPhase[] = [
-      {
-        directions: [LaneDirection.NORTH, LaneDirection.SOUTH],
-        laneType: LaneType.STRAIGHT,
-        durationsMs: 90_000,
-        rightTurnDurationMs: 45_000,
-      },
-      {
-        directions: [LaneDirection.NORTH, LaneDirection.SOUTH],
-        laneType: LaneType.LEFT,
-        durationsMs: 30_000,
-      },
-      {
-        directions: [LaneDirection.EAST, LaneDirection.WEST],
-        laneType: LaneType.STRAIGHT,
-        durationsMs: 90_000,
-        rightTurnDurationMs: 45_000,
-      },
-      {
-        directions: [LaneDirection.EAST, LaneDirection.WEST],
-        laneType: LaneType.LEFT,
-        durationsMs: 30_000,
-      },
-    ];
-
-    const phase = phases[this.currentPhaseIndex];
-
-    this.trafficLanes.forEach((lane: TrafficLane) => {
-      const isActiveDirection = phase.directions.includes(lane.laneDirection);
-
-      const isActiveStraightLane =
-        phase.laneType === LaneType.STRAIGHT &&
-        lane.laneType === LaneType.STRAIGHT;
-
-      const isActiveRightLane =
-        phase.laneType === LaneType.STRAIGHT &&
-        lane.laneType === LaneType.RIGHT;
-
-      const isActiveLeftLane =
-        phase.laneType === LaneType.LEFT && lane.laneType === LaneType.LEFT;
-      const isPermissiveLeftLane =
-        phase.laneType === LaneType.STRAIGHT && lane.laneType === LaneType.LEFT;
-
-      if (isActiveDirection && isPermissiveLeftLane) {
-        lane.trafficLightSignal = TrafficLightSignal.FLASHING_ORANGE;
-        return;
-      }
-
-      lane.trafficLightSignal =
-        isActiveDirection &&
-        (isActiveStraightLane || isActiveRightLane || isActiveLeftLane)
-          ? TrafficLightSignal.GREEN
-          : TrafficLightSignal.RED;
-    });
-
-    if (phase.rightTurnDurationMs) {
-      this.rightTurnTimeout = setTimeout(() => {
-        this.trafficLanes.forEach((lane: TrafficLane) => {
-          const shouldStopRightTurn =
-            phase.directions.includes(lane.laneDirection) &&
-            lane.laneType === LaneType.RIGHT;
-
-          if (shouldStopRightTurn) {
-            lane.trafficLightSignal = TrafficLightSignal.RED;
-          }
-        });
-      }, phase.rightTurnDurationMs);
-    }
-    this.trafficCycleTimeout = setTimeout(() => {
-      this.currentPhaseIndex = (this.currentPhaseIndex + 1) % phases.length;
-      this.runTrafficPhase();
-    }, phase.durationsMs);
-  }
-
   moveVehiclesBySignal(): void {
     this.moveVehiclesBySignalOnce();
 
@@ -485,36 +390,12 @@ export class Intersection {
     }, 1_000);
   }
 
-  startTimedTrafficCycle(): void {
-    this.currentPhaseIndex = 0;
-    this.runTrafficPhase();
-    this.moveVehiclesBySignal();
-  }
-
-  stopTimedTrafficCycle(): void {
-    if (this.trafficCycleTimeout) {
-      clearTimeout(this.trafficCycleTimeout);
-    }
-
-    if (this.rightTurnTimeout) {
-      clearTimeout(this.rightTurnTimeout);
-    }
-
-    if (this.vehicleMovementTimeout) {
-      clearTimeout(this.vehicleMovementTimeout);
-    }
-  }
-
-  getNextLaneLength(lane: TrafficLane): number {
-    return laneLengthSize;
-  }
-
   getExitDistanceFt(lane: TrafficLane): number {
     if (lane.laneType === LaneType.STRAIGHT) {
       return lane.length;
     }
 
-    return lane.length + this.getNextLaneLength(lane);
+    return lane.length + laneLengthSize;
   }
 
   getOppositeDirection(direction: LaneDirection): LaneDirection {
