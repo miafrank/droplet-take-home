@@ -1,7 +1,8 @@
-import { laneLengthSize } from "./const";
+import { laneLengthSize } from "./constants";
 import { LaneDirection } from "./enums/laneDirection";
 import { LaneType } from "./enums/laneType";
 import { TrafficLightSignal } from "./enums/trafficLightSignal";
+import { TrafficSensor } from "./trafficSensor";
 import { Vehicle } from "./vehicle";
 
 export class TrafficLane {
@@ -10,6 +11,7 @@ export class TrafficLane {
   laneType: LaneType;
   trafficLightSignal: TrafficLightSignal;
   length: number;
+  sensor: TrafficSensor;
 
   constructor(
     vehicles: Vehicle[],
@@ -17,12 +19,14 @@ export class TrafficLane {
     laneType: LaneType,
     trafficLightSignal: TrafficLightSignal,
     length = laneLengthSize,
+    sensor = new TrafficSensor(length),
   ) {
     this.vehicles = vehicles;
     this.laneDirection = laneDirection;
     this.laneType = laneType;
     this.trafficLightSignal = trafficLightSignal;
     this.length = length;
+    this.sensor = sensor;
   }
 
   addVehicle(vehicle: Vehicle) {
